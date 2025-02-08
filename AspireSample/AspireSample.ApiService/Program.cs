@@ -13,9 +13,8 @@ builder.Services.AddProblemDetails();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-// Add RabbitMQ messaging of localhost
+// Add RabbitMQ 
 builder.AddRabbitMQClient("rabbitmq");
-
 
 
 var app = builder.Build();
@@ -31,57 +30,71 @@ if (app.Environment.IsDevelopment())
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 var rabbitConnection = app.Services.GetRequiredService<IConnection>();
 
-string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
+string[] summaries =
+    ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
 
-app.MapGet("/weatherforecast", () =>
-    {
-    var requestId = Guid.NewGuid();
-    
-    // Use the logger to write events
-    if (logger.IsEnabled(LogLevel.Debug))
-    {
-        logger.LogDebug("Begin GetWeatherForecast call from method /weatherforecast ({requestId})", requestId);
-    }
-
-    
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    var serializedForecast = JsonSerializer.Serialize(forecast);
-    
-    #region RabbitMq
-    var channel = rabbitConnection.CreateModel();
+app.MapPost("/sendmessage", async Task<IResult> (IConnection connection, string messageToSend) =>
+{
+    var channel = connection.CreateModel();
     const string queueName = "weatherForecasts";
-    
-    channel.QueueDeclare(queue: queueName,
+
+    channel.QueueDeclare(
+        queue: queueName,
         durable: false,
         exclusive: false,
         autoDelete: false,
-        arguments: null);
-    
-    var body = Encoding.UTF8.GetBytes(serializedForecast);
-    
-    channel.BasicPublish(exchange: string.Empty,
+        arguments: null
+    );
+
+    var body = Encoding.UTF8.GetBytes(messageToSend);
+
+    channel.BasicPublish(
+        exchange: string.Empty,
         routingKey: queueName,
         mandatory: false,
         basicProperties: null,
-        body: body);
+        body: body
+    );
 
-    #endregion
-    
+    logger.LogInformation("Message sent to RabbitMQ");
     if (logger.IsEnabled(LogLevel.Debug))
     {
-        logger.LogDebug("Forecast obtained: {forecast} ({requestId})", JsonSerializer.Serialize(forecast),requestId);
-        logger.LogDebug("End GetWeatherForecast call from method /weatherforecast ({requestId})", requestId);
+        logger.LogDebug("Message: ({messageToSend})", messageToSend);
     }
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    return Results.Ok();
+});
+
+app.MapGet("/weatherforecast", () =>
+    {
+        var requestId = Guid.NewGuid();
+
+        // Use the logger to write events
+        if (logger.IsEnabled(LogLevel.Debug))
+        {
+            logger.LogDebug("Begin GetWeatherForecast call from method /weatherforecast ({requestId})", requestId);
+        }
+
+
+        var forecast = Enumerable.Range(1, 5).Select(index =>
+                new WeatherForecast
+                (
+                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+                    Random.Shared.Next(-20, 55),
+                    summaries[Random.Shared.Next(summaries.Length)]
+                ))
+            .ToArray();
+        var serializedForecast = JsonSerializer.Serialize(forecast);
+        
+        if (logger.IsEnabled(LogLevel.Debug))
+        {
+            logger.LogDebug("Forecast obtained: {forecast} ({requestId})", serializedForecast,
+                requestId);
+            logger.LogDebug("End GetWeatherForecast call from method /weatherforecast ({requestId})", requestId);
+        }
+
+        return forecast;
+    })
+    .WithName("GetWeatherForecast");
 
 app.MapDefaultEndpoints();
 
