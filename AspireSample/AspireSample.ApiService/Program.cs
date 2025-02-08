@@ -1,4 +1,6 @@
+using System.Text;
 using System.Text.Json;
+using RabbitMQ.Client;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +13,11 @@ builder.Services.AddProblemDetails();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+// Add RabbitMQ messaging of localhost
+builder.AddRabbitMQClient("rabbitmq");
+
+
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -22,6 +29,7 @@ if (app.Environment.IsDevelopment())
 }
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
+var rabbitConnection = app.Services.GetRequiredService<IConnection>();
 
 string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
 
@@ -44,6 +52,27 @@ app.MapGet("/weatherforecast", () =>
             summaries[Random.Shared.Next(summaries.Length)]
         ))
         .ToArray();
+    var serializedForecast = JsonSerializer.Serialize(forecast);
+    
+    #region RabbitMq
+    var channel = rabbitConnection.CreateModel();
+    const string queueName = "weatherForecasts";
+    
+    channel.QueueDeclare(queue: queueName,
+        durable: false,
+        exclusive: false,
+        autoDelete: false,
+        arguments: null);
+    
+    var body = Encoding.UTF8.GetBytes(serializedForecast);
+    
+    channel.BasicPublish(exchange: string.Empty,
+        routingKey: queueName,
+        mandatory: false,
+        basicProperties: null,
+        body: body);
+
+    #endregion
     
     if (logger.IsEnabled(LogLevel.Debug))
     {
