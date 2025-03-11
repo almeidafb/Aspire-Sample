@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="cache" uuid="6ea582e3-969a-4250-947e-ca3222cba13e">
+    <data-source source="LOCAL" name="cache" uuid="c98851f1-a481-423b-ab3e-306cb533eb6f">
       <driver-ref>redis</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>jdbc.RedisDriver</jdbc-driver>
-      <jdbc-url>jdbc:redis://localhost:32831</jdbc-url>
+      <jdbc-url>jdbc:redis://localhost:38657</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
   </component>
